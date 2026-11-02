@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Shodan OSINT</title>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--fg:#14202e;--mut:#5b6b7d;--line:#dbe2ea;--acc:#c0392b;--acc2:#1f6feb;--ok:#1e8e3e;--warn:#b26a00;--bad:#c62828;--code:#eef2f6}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1220;--card:#121b2b;--fg:#e6edf5;--mut:#93a4b8;--line:#22314a;--acc:#ff5a4e;--acc2:#58a6ff;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--code:#0d1626}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px 0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:900px;margin:0 auto}
+h1{font-size:17px;margin:0;letter-spacing:.2px}h1 span{color:var(--acc)}
+.cred{font-size:12px;color:var(--mut);text-align:right}
+nav{display:flex;gap:2px;overflow-x:auto;max-width:900px;margin:8px auto 0;scrollbar-width:none}
+nav button{flex:1 0 auto;border:0;background:none;color:var(--mut);padding:9px 12px;border-bottom:2px solid transparent;font:inherit;font-weight:600;cursor:pointer}
+nav button.on{color:var(--fg);border-color:var(--acc)}
+main{max-width:900px;margin:0 auto;padding:16px}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:18px;margin:0}.card h3{font-size:15px;margin:0 0 8px}
+.hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>input,.row>select{flex:1 1 180px}
+input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit;min-width:0}
+button.b{border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--acc);color:#fff;flex:0 0 auto}
+button.s{background:var(--code);color:var(--fg);border:1px solid var(--line)}
+button.sm{padding:5px 10px;font-size:13px}
+button:disabled{opacity:.5;cursor:default}
+label.chk{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--mut)}label.chk input{width:auto}
+.hint{font-size:13px;color:var(--mut);margin:8px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:12px;padding:4px 9px;border-radius:999px;background:var(--code);border:1px solid var(--line);cursor:pointer;color:var(--fg);font-family:ui-monospace,Menlo,Consolas,monospace}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:6px;background:var(--code);border:1px solid var(--line);margin:2px 4px 2px 0}
+.tag.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent);cursor:pointer}
+.tag.port{font-weight:700;color:var(--acc2)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:14px;margin:0}
+.kv dt{color:var(--mut)}.kv dd{margin:0;word-break:break-word}
+pre{background:var(--code);padding:10px;border-radius:8px;overflow:auto;max-height:280px;font-size:12px;white-space:pre-wrap;word-break:break-all;margin:8px 0 0}
+.msg{padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:14px;border:1px solid var(--line);background:var(--card)}
+.msg.err{border-color:var(--bad);color:var(--bad)}
+.msg.load{color:var(--mut)}
+.svc{border-top:1px solid var(--line);padding:10px 0}
+.svc:first-of-type{border-top:0}
+.svc .h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.svc .h b{color:var(--acc2);font-family:ui-monospace,Menlo,Consolas,monospace}
+.mut{color:var(--mut);font-size:13px}
+.res{padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
+.res:hover{background:color-mix(in srgb,var(--acc2) 6%,transparent)}
+.res .ip{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;color:var(--acc2)}
+.res .ban{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.facets{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.fb{font-size:13px;margin:3px 0;cursor:pointer}
+.fb .l{display:flex;justify-content:space-between;gap:8px}
+.fb .l span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb .t{height:6px;background:var(--code);border-radius:3px;overflow:hidden;margin-top:2px}
+.fb .t i{display:block;height:100%;background:var(--acc)}
+.pager{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.big{font-size:26px;font-weight:700}
+.sev{font-weight:700}.sev.c{color:var(--bad)}.sev.h{color:var(--warn)}.sev.m{color:var(--acc2)}
+details summary{cursor:pointer;color:var(--mut);font-size:13px;margin-top:6px}
+a{color:var(--acc2)}
+footer{max-width:900px;margin:0 auto;padding:4px 16px 30px;font-size:12px;color:var(--mut)}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1><span>◉</span> Shodan OSINT</h1>
+    <div class="cred" id="cred">nessuna key</div>
+  </div>
+  <nav id="nav">
+    <button data-tab="host" class="on">Host</button>
+    <button data-tab="cerca">Ricerca</button>
+    <button data-tab="dns">DNS</button>
+    <button data-tab="cve">CVE</button>
+    <button data-tab="imp">Impostazioni</button>
+  </nav>
+</header>
+
+<main>
+<!-- HOST -->
+<section id="t-host" class="on">
+  <div class="card">
+    <form class="row" id="f-host">
+      <input id="ip" placeholder="IP o hostname (es. 8.8.8.8)" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="b">Analizza</button>
+    </form>
+    <div class="row" style="margin-top:8px">
+      <label class="chk"><input type="checkbox" id="idb"> Solo InternetDB (gratis, senza key)</label>
+      <label class="chk"><input type="checkbox" id="hist"> Storico banner</label>
+      <button class="b s sm" id="myip" type="button">Il mio IP</button>
+    </div>
+  </div>
+  <div id="o-host"></div>
+</section>
+
+<!-- RICERCA -->
+<section id="t-cerca">
+  <div class="card">
+    <form id="f-cerca">
+      <div class="row">
+        <input id="q" placeholder='Query, es. hostname:esempio.it port:443' autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button class="b">Cerca</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input id="facets" placeholder="Facet, es. country:10,org:10,port:10" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <label class="chk"><input type="checkbox" id="countOnly" checked> Solo conteggio + facet (0 crediti)</label>
+      </div>
+    </form>
+    <div class="chips" id="filters"></div>
+    <p class="hint">Tocca un filtro per aggiungerlo alla query. La ricerca completa consuma 1 credito query se usi filtri o vai oltre pagina 1.</p>
+    <div class="chips" id="qhist"></div>
+  </div>
+  <div id="o-cerca"></div>
+</section>
+
+<!-- DNS -->
+<section id="t-dns">
+  <div class="card">
+    <h3>Risoluzione diretta</h3>
+    <form class="row" id="f-res"><input id="res" placeholder="hostname, separati da virgola" autocapitalize="off" spellcheck="false"><button class="b">Risolvi</button></form>
+  </div>
+  <div class="card">
+    <h3>Risoluzione inversa</h3>
+    <form class="row" id="f-rev"><input id="rev" placeholder="IP, separati da virgola" autocapitalize="off" spellcheck="false"><button class="b">Inverti</button></form>
+  </div>
+  <div class="card">
+    <h3>Sottodomini e record di un dominio</h3>
+    <form class="row" id="f-dom"><input id="dom" placeholder="dominio, es. esempio.it" autocapitalize="off" spellcheck="false"><button class="b">Elenca</button></form>
+    <p class="hint">Consuma 1 credito query.</p>
+  </div>
+  <div id="o-dns"></div>
+</section>
+
+<!-- CVE -->
+<section id="t-cve">
+  <div class="card">
+    <form class="row" id="f-cve">
+      <input id="cve" placeholder="CVE-2021-44228 oppure nome prodotto (es. nginx)" autocapitalize="off" spellcheck="false">
+      <button class="b">Cerca</button>
+    </form>
+    <div class="row" style="margin-top:8px">
+      <label class="chk"><input type="checkbox" id="kev"> Solo sfruttate attivamente (CISA KEV)</label>
+    </div>
+    <p class="hint">Usa il database CVEDB di Shodan: gratuito, senza key.</p>
+  </div>
+  <div id="o-cve"></div>
+</section>
+
+<!-- IMPOSTAZIONI -->
+<section id="t-imp">
+  <div class="card">
+    <h3>API key Shodan</h3>
+    <div class="row">
+      <input id="key" type="password" placeholder="Incolla la tua API key" autocomplete="off" spellcheck="false">
+      <button class="b s" id="showkey" type="button">👁</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="b" id="savekey" type="button">Salva e verifica</button>
+      <button class="b s" id="delkey" type="button">Cancella</button>
+    </div>
+    <p class="hint">La key resta solo nel browser di questo dispositivo (localStorage) e viene inviata soltanto ad api.shodan.io. La trovi su account.shodan.io.</p>
+  </div>
+  <div id="o-imp"></div>
+  <div class="card">
+    <h3>Dati locali</h3>
+    <button class="b s" id="clrhist" type="button">Cancella cronologia ricerche</button>
+  </div>
+</section>
+</main>
+
+<footer>
+  Strumento di ricognizione passiva: interroga solo i dati già indicizzati da Shodan, non contatta i dispositivi.
+  Collegarsi a sistemi trovati senza autorizzazione del proprietario è reato (art. 615-ter c.p.).
+</footer>
+
+<script>
+const API='https://api.shodan.io', IDB='https://internetdb.shodan.io', CVEDB='https://cvedb.shodan.io';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}},del(k){try{localStorage.removeItem(k)}catch{}}};
+const isIP=s=>/^(\d{1,3}\.){3}\d{1,3}$/.test(s)||/^[0-9a-f:]+:[0-9a-f:]*$/i.test(s);
+const fmtDate=s=>{if(!s)return'';const t=String(s).replace(/(\.\d{3})\d+/,'$1');const d=new Date(/Z$|[+-]\d\d:?\d\d$/.test(t)?t:t+'Z');return isNaN(d)?s:d.toLocaleString('it-IT')};
+const fmtN=n=>Number(n||0).toLocaleString('it-IT');
+let curHost=null, curSearch=null;
+
+/* ---------- rete ---------- */
+async function jget(u){
+  let r;
+  try{r=await fetch(u)}catch(e){throw new Error('Richiesta bloccata dalla rete o dal browser (CORS/offline). Dettaglio: '+e.message)}
+  let j=null;try{j=await r.json()}catch{}
+  if(!r.ok){
+    const m=(j&&(j.error||j.detail))||('HTTP '+r.status);
+    if(r.status===401) throw new Error('API key non valida o mancante ('+m+')');
+    if(r.status===403) throw new Error('Funzione non inclusa nel tuo piano Shodan ('+m+')');
+    if(r.status===429) throw new Error('Troppe richieste: attendi qualche secondo ('+m+')');
+    throw new Error(m);
+  }
+  return j;
+}
+function sh(path,params={}){
+  const k=LS.get('shodan_key','');
+  if(!k) return Promise.reject(new Error('Inserisci la API key in Impostazioni'));
+  const u=new URL(API+path);u.searchParams.set('key',k);
+  for(const[a,b] of Object.entries(params)) if(b!==''&&b!=null&&b!==false) u.searchParams.set(a,b);
+  return jget(u);
+}
+const msg=(el,t,cls='err')=>{el.innerHTML=`<div class="msg ${cls}">${esc(t)}</div>`};
+const load=el=>msg(el,'Caricamento…','load');
+
+/* ---------- tab ---------- */
+function tab(n){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===n));
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='t-'+n));
+  window.scrollTo(0,0);
+}
+
+/* ---------- account ---------- */
+async function refreshCred(out){
+  try{
+    const d=await sh('/api-info');
+    $('#cred').innerHTML=`piano <b>${esc(d.plan)}</b> · query ${fmtN(d.query_credits)} · scan ${fmtN(d.scan_credits)}`;
+    if(out) out.innerHTML=`<div class="card"><h3>Account</h3><dl class="kv">
+      ${kv('Piano',d.plan)}${kv('Crediti query',fmtN(d.query_credits))}${kv('Crediti scan',fmtN(d.scan_credits))}
+      ${kv('IP monitorati',d.monitored_ips)}${kv('Filtri sbloccati',d.unlocked?'sì':'no')}</dl></div>`;
+  }catch(e){ $('#cred').textContent=LS.get('shodan_key','')?'key non verificata':'nessuna key'; if(out) msg(out,e.message); }
+}
+
+/* ---------- helpers render ---------- */
+function kv(k,v){ if(v==null||v===''||(Array.isArray(v)&&!v.length)) return ''; return `<dt>${esc(k)}</dt><dd>${Array.isArray(v)?v.map(esc).join(', '):esc(v)}</dd>`; }
+const cveTags=list=>list.map(c=>`<span class="tag bad" data-cve="${esc(c)}">${esc(c)}</span>`).join('');
+function sevCls(s){s=Number(s);return s>=9?'c':s>=7?'h':s>=4?'m':''}
+function download(name,text,type){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+
+/* ---------- HOST ---------- */
+async function lookupHost(target){
+  const out=$('#o-host');target=target.trim();if(!target)return;
+  tab('host');$('#ip').value=target;load(out);
+  try{
+    let ip=target;
+    if(!isIP(target)){
+      if($('#idb').checked) throw new Error('InternetDB accetta solo indirizzi IP');
+      const r=await sh('/dns/resolve',{hostnames:target});
+      ip=r[target];if(!ip) throw new Error('Impossibile risolvere '+target);
+    }
+    if($('#idb').checked){
+      let d;
+      try{d=await jget(IDB+'/'+encodeURIComponent(ip))}catch(e){if(/No information/i.test(e.message))throw new Error('Nessun dato InternetDB per '+ip);throw e}
+      curHost=d;renderIDB(d,out);
+    }else{
+      const d=await sh('/shodan/host/'+encodeURIComponent(ip),{history:$('#hist').checked?'true':''});
+      curHost=d;renderHost(d,out,target!==ip?target:'');
+    }
+  }catch(e){
+    msg(out,e.message+(/No information/i.test(e.message)?' — Shodan non ha dati su questo IP. Prova InternetDB.':''));
+  }
+}
+function renderIDB(d,out){
+  out.innerHTML=`<div class="card"><div class="hd"><h2>${esc(d.ip)}</h2><span class="mut">InternetDB</span></div>
+  <dl class="kv">${kv('Hostname',d.hostnames)}${kv('CPE',d.cpes)}${kv('Tag',d.tags)}</dl>
+  <h3 style="margin-top:12px">Porte</h3><div>${(d.ports||[]).map(p=>`<span class="tag port">${p}</span>`).join('')||'<span class="mut">nessuna</span>'}</div>
+  ${(d.vulns||[]).length?`<h3 style="margin-top:12px">Vulnerabilità potenziali (${d.vulns.length})</h3><div>${cveTags(d.vulns)}</div>`:''}
+  <p class="hint">Per banner, organizzazione e geolocalizzazione disattiva “Solo InternetDB”.</p></div>`;
+}
+function renderHost(h,out,fromName){
+  const vulns=Array.isArray(h.vulns)?h.vulns:Object.keys(h.vulns||{});
+  const loc=[h.city,h.region_code,h.country_name].filter(Boolean).join(', ');
+  const map=(h.latitude!=null&&h.longitude!=null)?`<a href="https://www.openstreetmap.org/?mlat=${h.latitude}&mlon=${h.longitude}#map=11/${h.latitude}/${h.longitude}" target="_blank" rel="noopener">mappa ↗</a>`:'';
+  const svcs=[...(h.data||[])].sort((a,b)=>a.port-b.port||String(b.timestamp).localeCompare(String(a.timestamp)));
+  let html=`<div class="card"><div class="hd"><h2>${esc(h.ip_str)}${fromName?` <span class="mut">(${esc(fromName)})</span>`:''}</h2>
+    <button class="b s sm" id="xjson">Esporta JSON</button></div>
+    <dl class="kv">${kv('Organizzazione',h.org)}${kv('ISP',h.isp)}${kv('ASN',h.asn)}
+    ${loc?`<dt>Posizione</dt><dd>${esc(loc)} ${map}</dd>`:''}${kv('Sistema operativo',h.os)}
+    ${kv('Hostname',h.hostnames)}${kv('Domini',h.domains)}${kv('Tag',h.tags)}${kv('Ultimo aggiornamento',fmtDate(h.last_update))}</dl>
+    <h3 style="margin-top:12px">Porte aperte (${(h.ports||[]).length})</h3>
+    <div>${(h.ports||[]).sort((a,b)=>a-b).map(p=>`<span class="tag port">${p}</span>`).join('')}</div>
+    ${vulns.length?`<h3 style="margin-top:12px">Vulnerabilità segnalate (${vulns.length})</h3><div>${cveTags(vulns.sort().reverse())}</div><p class="hint">Desunte dalla versione del software: vanno verificate. Tocca un CVE per i dettagli.</p>`:''}
+  </div><div class="card"><h3>Servizi${$('#hist').checked?' (con storico)':''}</h3>`;
+  for(const s of svcs){
+    const sv=s.vulns?Object.keys(s.vulns):[];
+    const cert=s.ssl&&s.ssl.cert;
+    html+=`<div class="svc"><div class="h"><b>${s.port}/${esc(s.transport||'tcp')}</b>
+      <span>${esc([s.product,s.version].filter(Boolean).join(' '))||esc(s._shodan&&s._shodan.module||'')}</span>
+      <span class="mut">${esc(fmtDate(s.timestamp))}</span></div>
+      ${s.http&&s.http.title?`<div class="mut">HTTP: ${esc(s.http.title)}${s.http.status?' · '+s.http.status:''}</div>`:''}
+      ${cert?`<div class="mut">TLS: CN=${esc(cert.subject&&cert.subject.CN)} · emesso da ${esc((cert.issuer&&(cert.issuer.O||cert.issuer.CN))||'?')}${cert.expired?' · <span style="color:var(--bad)">SCADUTO</span>':''}</div>`:''}
+      ${s.cpe23&&s.cpe23.length?`<div class="mut">CPE: ${esc(s.cpe23.join(', '))}</div>`:''}
+      ${sv.length?`<div>${cveTags(sv.slice(0,12))}${sv.length>12?`<span class="mut">+${sv.length-12}</span>`:''}</div>`:''}
+      ${s.data?`<details><summary>Banner</summary><pre>${esc(s.data)}</pre></details>`:''}</div>`;
+  }
+  html+=svcs.length?'</div>':'<p class="mut">Nessun servizio.</p></div>';
+  out.innerHTML=html;
+  $('#xjson').onclick=()=>download('host-'+h.ip_str+'.json',JSON.stringify(h,null,2),'application/json');
+}
+
+/* ---------- RICERCA ---------- */
+const FILTERS=['hostname:','net:','org:""','asn:AS','country:IT','city:""','port:','product:""','os:""','ssl.cert.subject.cn:','http.title:""','has_vuln:true','vuln:CVE-'];
+function insertFilter(f){const q=$('#q');q.value=(q.value.trim()+' '+f).trim();q.focus();const i=f.endsWith('""')?q.value.length-1:q.value.length;q.setSelectionRange(i,i)}
+function pushHist(q){let h=LS.get('qhist',[]).filter(x=>x!==q);h.unshift(q);LS.set('qhist',h.slice(0,12));drawHist()}
+function drawHist(){const h=LS.get('qhist',[]);$('#qhist').innerHTML=h.length?'<span class="mut" style="width:100%">Recenti:</span>'+h.map(q=>`<span class="chip" data-q="${esc(q)}">${esc(q)}</span>`).join(''):''}
+async function doSearch(page=1){
+  const q=$('#q').value.trim(),out=$('#o-cerca');if(!q)return;
+  const facets=$('#facets').value.trim(),countOnly=$('#countOnly').checked;
+  load(out);pushHist(q);
+  try{
+    const d=countOnly?await sh('/shodan/host/count',{query:q,facets})
+                     :await sh('/shodan/host/search',{query:q,facets,page,minify:'true'});
+    curSearch={q,page,d};renderSearch(d,countOnly,page);
+    if(!countOnly) refreshCred();
+  }catch(e){msg(out,e.message)}
+}
+function renderSearch(d,countOnly,page){
+  const out=$('#o-cerca'),m=d.matches||[];
+  let html=`<div class="card"><div class="hd"><div><div class="big">${fmtN(d.total)}</div><div class="mut">risultati totali</div></div>
+    ${m.length?'<div class="row"><button class="b s sm" id="xcsv">CSV</button><button class="b s sm" id="xj">JSON</button></div>':''}</div>`;
+  if(d.facets&&Object.keys(d.facets).length){
+    html+='<div class="facets">';
+    for(const[name,arr] of Object.entries(d.facets)){
+      const max=Math.max(1,...arr.map(x=>x.count));
+      html+=`<div><h3>${esc(name)}</h3>`+arr.map(x=>`<div class="fb" data-ins="${esc(name+':'+(/\s/.test(String(x.value))?'"'+x.value+'"':x.value))}">
+        <div class="l"><span>${esc(x.value)}</span><span class="mut">${fmtN(x.count)}</span></div><div class="t"><i style="width:${(x.count/max*100).toFixed(1)}%"></i></div></div>`).join('')+'</div>';
+    }
+    html+='</div><p class="hint">Tocca una voce per restringere la query.</p>';
+  }else if(countOnly) html+='<p class="hint">Aggiungi delle facet (es. country:10,org:10,port:10) per vedere la distribuzione.</p>';
+  if(countOnly&&d.total>0) html+=`<button class="b" id="loadres" style="margin-top:10px">Mostra risultati (usa crediti)</button>`;
+  html+='</div>';
+  if(m.length){
+    html+='<div class="card"><h3>Risultati</h3>'+m.map(r=>{
+      const loc=[r.location&&r.location.city,r.location&&r.location.country_code].filter(Boolean).join(', ');
+      const ban=(r.http&&r.http.title)||String(r.data||'').split('\n')[0];
+      return `<div class="res" data-ip="${esc(r.ip_str)}"><div><span class="ip">${esc(r.ip_str)}:${r.port}</span> <span class="mut">${esc(loc)}</span></div>
+        <div>${esc(r.org||'')}${r.product?' · '+esc([r.product,r.version].filter(Boolean).join(' ')):''}</div>
+        ${(r.hostnames||[]).length?`<div class="mut">${esc(r.hostnames.slice(0,3).join(', '))}</div>`:''}
+        <div class="ban">${esc(ban)}</div></div>`;}).join('');
+    const pages=Math.ceil(d.total/100);
+    html+=`<div class="pager"><button class="b s sm" id="prev" ${page<=1?'disabled':''}>← Prec.</button>
+      <span class="mut">pagina ${page} di ${fmtN(pages)}</span><button class="b s sm" id="next" ${page>=pages?'disabled':''}>Succ. →</button></div></div>`;
+  }
+  out.innerHTML=html;
+  if($('#loadres')) $('#loadres').onclick=()=>{$('#countOnly').checked=false;doSearch(1)};
+  if($('#prev')) $('#prev').onclick=()=>doSearch(page-1);
+  if($('#next')) $('#next').onclick=()=>doSearch(page+1);
+  if($('#xj')) $('#xj').onclick=()=>download('shodan-ricerca.json',JSON.stringify(d,null,2),'application/json');
+  if($('#xcsv')) $('#xcsv').onclick=()=>{
+    const cols=['ip','porta','trasporto','org','isp','asn','paese','citta','prodotto','versione','hostname','timestamp'];
+    const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const rows=m.map(r=>[r.ip_str,r.port,r.transport,r.org,r.isp,r.asn,r.location&&r.location.country_code,r.location&&r.location.city,r.product,r.version,(r.hostnames||[]).join(' '),r.timestamp].map(q).join(';'));
+    download('shodan-ricerca.csv','\ufeff'+cols.join(';')+'\n'+rows.join('\n'),'text/csv');
+  };
+}
+
+/* ---------- DNS ---------- */
+const listOf=s=>s.split(/[,\s]+/).map(x=>x.trim()).filter(Boolean).join(',');
+async function dnsResolve(){
+  const out=$('#o-dns'),v=listOf($('#res').value);if(!v)return;load(out);
+  try{const d=await sh('/dns/resolve',{hostnames:v});
+    out.innerHTML='<div class="card"><h3>Risoluzione</h3><dl class="kv">'+Object.entries(d).map(([h,ip])=>`<dt>${esc(h)}</dt><dd>${ip?`<a href="#" data-ip="${esc(ip)}">${esc(ip)}</a>`:'<span class="mut">non risolto</span>'}</dd>`).join('')+'</dl></div>';
+  }catch(e){msg(out,e.message)}
+}
+async function dnsReverse(){
+  const out=$('#o-dns'),v=listOf($('#rev').value);if(!v)return;load(out);
+  try{const d=await sh('/dns/reverse',{ips:v});
+    out.innerHTML='<div class="card"><h3>Inversa</h3><dl class="kv">'+Object.entries(d).map(([ip,hs])=>`<dt><a href="#" data-ip="${esc(ip)}">${esc(ip)}</a></dt><dd>${hs&&hs.length?esc(hs.join(', ')):'<span class="mut">nessun PTR</span>'}</dd>`).join('')+'</dl></div>';
+  }catch(e){msg(out,e.message)}
+}
+async function dnsDomain(){
+  const out=$('#o-dns'),v=$('#dom').value.trim().toLowerCase();if(!v)return;load(out);
+  try{const d=await sh('/dns/domain/'+encodeURIComponent(v));
+    const recs=(d.data||[]).sort((a,b)=>(a.subdomain||'').localeCompare(b.subdomain||'')||a.type.localeCompare(b.type));
+    out.innerHTML=`<div class="card"><div class="hd"><h3 style="margin:0">${esc(d.domain)} · ${(d.subdomains||[]).length} sottodomini</h3><button class="b s sm" id="xdns">JSON</button></div>
+      ${(d.tags||[]).length?`<div>${d.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
+      ${recs.map(r=>{const name=(r.subdomain?r.subdomain+'.':'')+d.domain;const val=String(r.value);
+        return `<div class="svc"><div class="h"><b>${esc(r.type)}</b><span>${esc(name)}</span></div>
+        <div>${(r.type==='A'||r.type==='AAAA')?`<a href="#" data-ip="${esc(val)}">${esc(val)}</a>`:esc(val)}</div>
+        <div class="mut">visto ${esc(fmtDate(r.last_seen))}</div></div>`}).join('')}
+      ${d.more?'<p class="hint">Ci sono altri record non mostrati.</p>':''}</div>`;
+    $('#xdns').onclick=()=>download('dns-'+d.domain+'.json',JSON.stringify(d,null,2),'application/json');
+    refreshCred();
+  }catch(e){msg(out,e.message)}
+}
+
+/* ---------- CVE ---------- */
+async function cveSearch(v){
+  const out=$('#o-cve');v=(v??$('#cve').value).trim();if(!v)return;
+  tab('cve');$('#cve').value=v;load(out);
+  try{
+    if(/^CVE-\d{4}-\d+$/i.test(v)){
+      const c=await jget(CVEDB+'/cve/'+encodeURIComponent(v.toUpperCase()));
+      const sc=c.cvss_v3??c.cvss;
+      out.innerHTML=`<div class="card"><div class="hd"><h2>${esc(c.cve_id)}</h2>
+        ${sc!=null?`<span class="sev ${sevCls(sc)}">CVSS ${esc(sc)}</span>`:''}</div>
+        <p>${esc(c.summary)}</p>
+        <dl class="kv">${kv('Pubblicata',fmtDate(c.published_time))}
+        ${c.epss!=null?kv('EPSS (prob. sfruttamento 30gg)',(c.epss*100).toFixed(2)+'%'):''}
+        ${kv('Sfruttata attivamente (KEV)',c.kev?'SÌ':'no')}${kv('Ransomware',c.ransomware_campaign)}${kv('Azione suggerita',c.propose_action)}</dl>
+        ${(c.cpes||[]).length?`<details><summary>Prodotti interessati (${c.cpes.length})</summary><pre>${esc(c.cpes.slice(0,200).join('\n'))}</pre></details>`:''}
+        ${(c.references||[]).length?`<details open><summary>Riferimenti</summary>${c.references.slice(0,15).map(r=>`<div><a href="${esc(r)}" target="_blank" rel="noopener">${esc(r)}</a></div>`).join('')}</details>`:''}
+        <p class="hint"><a href="#" data-q="vuln:${esc(c.cve_id)}">Cerca host esposti con questo CVE →</a> (filtro vuln: solo piani a pagamento)</p></div>`;
+    }else{
+      const u=new URL(CVEDB+'/cves');u.searchParams.set('product',v);u.searchParams.set('limit','50');u.searchParams.set('sort_by_epss','true');
+      if($('#kev').checked) u.searchParams.set('is_kev','true');
+      const d=await jget(u);const list=d.cves||[];
+      out.innerHTML=`<div class="card"><h3>${list.length} CVE per “${esc(v)}” (ordinate per probabilità di sfruttamento)</h3>`+
+        (list.map(c=>{const sc=c.cvss_v3??c.cvss;return `<div class="res" data-cve="${esc(c.cve_id)}"><div><span class="ip">${esc(c.cve_id)}</span>
+        ${sc!=null?` <span class="sev ${sevCls(sc)}">${esc(sc)}</span>`:''}${c.kev?' <span class="tag bad">KEV</span>':''}
+        ${c.epss!=null?` <span class="mut">EPSS ${(c.epss*100).toFixed(1)}%</span>`:''}</div>
+        <div class="mut">${esc(String(c.summary||'').slice(0,200))}</div></div>`}).join('')||'<p class="mut">Nessun risultato.</p>')+'</div>';
+    }
+  }catch(e){msg(out,e.message)}
+}
+
+/* ---------- eventi ---------- */
+$('#nav').onclick=e=>{const b=e.target.closest('[data-tab]');if(b)tab(b.dataset.tab)};
+$('#f-host').onsubmit=e=>{e.preventDefault();lookupHost($('#ip').value)};
+$('#myip').onclick=async()=>{try{const ip=await sh('/tools/myip');lookupHost(ip)}catch(e){msg($('#o-host'),e.message)}};
+$('#f-cerca').onsubmit=e=>{e.preventDefault();doSearch(1)};
+$('#f-res').onsubmit=e=>{e.preventDefault();dnsResolve()};
+$('#f-rev').onsubmit=e=>{e.preventDefault();dnsReverse()};
+$('#f-dom').onsubmit=e=>{e.preventDefault();dnsDomain()};
+$('#f-cve').onsubmit=e=>{e.preventDefault();cveSearch()};
+$('#filters').innerHTML=FILTERS.map(f=>`<span class="chip" data-ins="${esc(f)}">${esc(f)}</span>`).join('');
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-ip],[data-cve],[data-ins],[data-q]');if(!t)return;
+  if(t.dataset.ip){e.preventDefault();lookupHost(t.dataset.ip)}
+  else if(t.dataset.cve){e.preventDefault();cveSearch(t.dataset.cve)}
+  else if(t.dataset.ins!=null){insertFilter(t.dataset.ins);if(t.classList.contains('fb'))doSearch(1)}
+  else if(t.dataset.q){e.preventDefault();tab('cerca');$('#q').value=t.dataset.q;doSearch(1)}
+});
+$('#key').value=LS.get('shodan_key','');
+$('#showkey').onclick=()=>{const k=$('#key');k.type=k.type==='password'?'text':'password'};
+$('#savekey').onclick=()=>{const k=$('#key').value.trim();if(!k)return;LS.set('shodan_key',k);refreshCred($('#o-imp'))};
+$('#delkey').onclick=()=>{LS.del('shodan_key');$('#key').value='';$('#o-imp').innerHTML='';$('#cred').textContent='nessuna key'};
+$('#clrhist').onclick=()=>{LS.del('qhist');drawHist()};
+drawHist();
+if(LS.get('shodan_key','')) refreshCred(); else tab('imp');
+</script>
+</body>
+</html>
