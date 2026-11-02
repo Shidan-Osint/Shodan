@@ -145,7 +145,7 @@ footer{max-width:900px;margin:0 auto;padding:4px 16px 30px;font-size:12px;color:
     <div class="row" style="margin-top:8px">
       <label class="chk"><input type="checkbox" id="kev"> Solo sfruttate attivamente (CISA KEV)</label>
     </div>
-    <p class="hint">Usa il database CVEDB di Shodan: gratuito, senza key.</p>
+    <p class="hint">Usa i database pubblici NVD (NIST) ed EPSS (FIRST): gratuiti, senza key. Massimo circa 5 richieste ogni 30 secondi.</p>
   </div>
   <div id="o-cve"></div>
 </section>
@@ -178,7 +178,7 @@ footer{max-width:900px;margin:0 auto;padding:4px 16px 30px;font-size:12px;color:
 </footer>
 
 <script>
-const API='https://api.shodan.io', IDB='https://internetdb.shodan.io', CVEDB='https://cvedb.shodan.io';
+const API='https://api.shodan.io', IDB='https://internetdb.shodan.io', NVD='https://services.nvd.nist.gov/rest/json/cves/2.0', EPSS='https://api.first.org/data/v1/epss';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}},del(k){try{localStorage.removeItem(k)}catch{}}};
@@ -386,13 +386,50 @@ async function dnsDomain(){
 }
 
 /* ---------- CVE ---------- */
+/* CVEDB di Shodan non invia intestazioni CORS: il browser non puo' leggerlo. Si usano NVD ed EPSS. */
+async function nvdGet(qs){
+  let r;
+  try{r=await fetch(NVD+'?'+qs)}catch(e){throw new Error('NVD non raggiungibile o troppe richieste: attendi 30 secondi e riprova. Dettaglio: '+e.message)}
+  if(r.status===403||r.status===429||r.status===503) throw new Error('Troppe richieste a NVD: attendi 30 secondi e riprova (HTTP '+r.status+')');
+  if(!r.ok) throw new Error('NVD ha risposto con errore HTTP '+r.status);
+  return r.json();
+}
+function nvdNorm(x){
+  const c=x.cve,m=c.metrics||{};
+  const set=m.cvssMetricV31||m.cvssMetricV30||m.cvssMetricV40||m.cvssMetricV2||[];
+  const b=set.find(s=>s.type==='Primary')||set[0];
+  return {
+    cve_id:c.id,
+    summary:((c.descriptions||[]).find(d=>d.lang==='en')||(c.descriptions||[])[0]||{}).value,
+    published_time:c.published,
+    cvss:b?.cvssData?.baseScore,
+    kev:!!c.cisaExploitAdd,
+    propose_action:c.cisaRequiredAction,
+    cpes:(c.configurations||[]).flatMap(g=>g.nodes||[]).flatMap(n=>n.cpeMatch||[]).filter(p=>p.vulnerable).map(p=>p.criteria),
+    references:[...new Set((c.references||[]).map(r=>r.url))]
+  };
+}
+/* EPSS e' un dato aggiuntivo: se non risponde, i risultati restano validi senza punteggio. */
+async function addEpss(list){
+  for(let i=0;i<list.length;i+=100){
+    const part=list.slice(i,i+100);
+    try{
+      const r=await fetch(EPSS+'?limit=100&cve='+part.map(c=>c.cve_id).join(','));
+      if(!r.ok) return;
+      const map=new Map(((await r.json()).data||[]).map(e=>[e.cve,Number(e.epss)]));
+      for(const c of part) if(map.has(c.cve_id)) c.epss=map.get(c.cve_id);
+    }catch{return}
+  }
+}
 async function cveSearch(v){
   const out=$('#o-cve');v=(v??$('#cve').value).trim();if(!v)return;
   tab('cve');$('#cve').value=v;load(out);
   try{
     if(/^CVE-\d{4}-\d+$/i.test(v)){
-      const c=await jget(CVEDB+'/cve/'+encodeURIComponent(v.toUpperCase()));
-      const sc=c.cvss_v3??c.cvss;
+      const d=await nvdGet('cveId='+encodeURIComponent(v.toUpperCase()));
+      if(!(d.vulnerabilities||[]).length) throw new Error('CVE non trovata in NVD: '+v.toUpperCase());
+      const c=nvdNorm(d.vulnerabilities[0]);await addEpss([c]);
+      const sc=c.cvss;
       out.innerHTML=`<div class="card"><div class="hd"><h2>${esc(c.cve_id)}</h2>
         ${sc!=null?`<span class="sev ${sevCls(sc)}">CVSS ${esc(sc)}</span>`:''}</div>
         <p>${esc(c.summary)}</p>
@@ -401,13 +438,21 @@ async function cveSearch(v){
         ${kv('Sfruttata attivamente (KEV)',c.kev?'SÌ':'no')}${kv('Ransomware',c.ransomware_campaign)}${kv('Azione suggerita',c.propose_action)}</dl>
         ${(c.cpes||[]).length?`<details><summary>Prodotti interessati (${c.cpes.length})</summary><pre>${esc(c.cpes.slice(0,200).join('\n'))}</pre></details>`:''}
         ${(c.references||[]).length?`<details open><summary>Riferimenti</summary>${c.references.slice(0,15).map(r=>`<div><a href="${esc(r)}" target="_blank" rel="noopener">${esc(r)}</a></div>`).join('')}</details>`:''}
-        <p class="hint"><a href="#" data-q="vuln:${esc(c.cve_id)}">Cerca host esposti con questo CVE →</a> (filtro vuln: solo piani a pagamento)</p></div>`;
+        <p class="hint"><a href="#" data-q="vuln:${esc(c.cve_id)}">Cerca host esposti con questo CVE →</a> (filtro vuln: solo da piano Small Business in su)</p></div>`;
     }else{
-      const u=new URL(CVEDB+'/cves');u.searchParams.set('product',v);u.searchParams.set('limit','50');u.searchParams.set('sort_by_epss','true');
-      if($('#kev').checked) u.searchParams.set('is_kev','true');
-      const d=await jget(u);const list=d.cves||[];
-      out.innerHTML=`<div class="card"><h3>${list.length} CVE per “${esc(v)}” (ordinate per probabilità di sfruttamento)</h3>`+
-        (list.map(c=>{const sc=c.cvss_v3??c.cvss;return `<div class="res" data-cve="${esc(c.cve_id)}"><div><span class="ip">${esc(c.cve_id)}</span>
+      /* accetta anche i nomi tecnici, es. my_cloud_ex2_firmware -> my cloud ex2 */
+      const kw=v.replace(/_firmware$/i,'').replace(/_/g,' ').trim();
+      const qs='keywordSearch='+encodeURIComponent(kw)+($('#kev').checked?'&hasKev':'')+'&resultsPerPage=200';
+      let d=await nvdGet(qs);
+      /* NVD restituisce prima le piu' vecchie: oltre 200 risultati si prendono le piu' recenti */
+      if(d.totalResults>200) d=await nvdGet(qs+'&startIndex='+(d.totalResults-200));
+      const all=(d.vulnerabilities||[]).map(nvdNorm);
+      await addEpss(all);
+      all.sort((a,b)=>(b.epss??-1)-(a.epss??-1)||(b.cvss??-1)-(a.cvss??-1));
+      const list=all.slice(0,50);
+      const note=d.totalResults>list.length?` — mostrate ${list.length}${d.totalResults>200?', scelte tra le 200 più recenti':''}`:'';
+      out.innerHTML=`<div class="card"><h3>${fmtN(d.totalResults)} CVE per “${esc(kw)}”${note} (ordinate per probabilità di sfruttamento)</h3>`+
+        (list.map(c=>{const sc=c.cvss;return `<div class="res" data-cve="${esc(c.cve_id)}"><div><span class="ip">${esc(c.cve_id)}</span>
         ${sc!=null?` <span class="sev ${sevCls(sc)}">${esc(sc)}</span>`:''}${c.kev?' <span class="tag bad">KEV</span>':''}
         ${c.epss!=null?` <span class="mut">EPSS ${(c.epss*100).toFixed(1)}%</span>`:''}</div>
         <div class="mut">${esc(String(c.summary||'').slice(0,200))}</div></div>`}).join('')||'<p class="mut">Nessun risultato.</p>')+'</div>';
